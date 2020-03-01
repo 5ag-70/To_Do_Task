@@ -27,7 +27,7 @@
 		{% for taskboard in taskboards %}
 		<div class="col-lg-2 col-md-2 mb-0">
 			<img class="img-responsive" src="/images/task.jpg" alt="..." />
-			<h3 style="text-align:center;"><a href='taskboard_details/{{ taskboard }}'>{{ taskboard.split(':')[1] }}</a></h3>
+			<h3 style="text-align:center;"><a href='taskboard_details/{{ taskboard.key.urlsafe() }}'>{{ taskboard.title }}</a></h3>
 		</div>
 		{% endfor %}
 	</body>

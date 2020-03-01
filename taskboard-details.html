@@ -13,18 +13,31 @@
 		<script>
 			$( function() {
 				$( "#due_date" ).datepicker();
+				$( "#edit-due-date" ).datepicker();
 			} );
 		</script>
 		<title>Taskboard Details</title>
 	</head>
 	<body>
-		<div class="col-lg-9 col-md-9 mb-0">
-			<h3>{{ taskboard.taskboard }} Taskboard</h3>
+		<div id="taskboard-title" class="col-lg-9 col-md-9 mb-0">
+			{% if current_user == taskboard.created_by %}
+				<h3>{{ taskboard.title }} Taskboard<span onclick="hide_title()" class="glyphicon glyphicon-pencil"></span></h3>
+			{% else %}
+				<h3>{{ taskboard.title }} Taskboard</h3>
+			{% endif %}
+		</div>
+		<div id="edit-taskboard-title" class="col-lg-9 col-md-9 mb-0">
+			<h3><input id="taskboard-new-title" type="text" value="{{ taskboard.title }}">
+				<Button onclick="save_taskboard_title()" class="btn-success">Save</Button>
+				<Button onclick="show_taskboard_title()" class="btn-danger">Cancel</Button>
+			</h3>
 		</div>
 		<div class="col-lg-3 col-md-3 mb-0">
-			<h5>{{ welcome_message }} <a href="{{ logout_url }}">Logout</a></h5>
+			<h5>{{ welcome_message }} <a href="/">Home</a></h5>
 			<div class="col-lg-6 col-md-6 mb-0">
+			{% if current_user == taskboard.created_by %}
 				<button type="button" class="btn btn-info" data-toggle="modal" data-target="#inviteUserModal">Invite User</button>
+			{%endif%}
 			</div>
 			<div class="col-lg-6 col-md-6 mb-0">
 				<button type="button" class="btn btn-info" data-toggle="modal" data-target="#taskModal">Create task</button>
@@ -56,8 +69,8 @@
 									{% for task in tasks %} 
 										<tr>  
 											<td>
-												<button type="button" class="btn btn-info" data-toggle="modal" data-target="#editTaskModal">Edit</button>
-												<button type="button" class="btn btn-danger" onclick="delete_task('{{ key }}:{{ task.title }}')">Delete</button>
+												<button type="button" class="btn btn-info open-my-modal" data-toggle="modal" data-target="#editTaskModal" data-key="{{ task.key.urlsafe() }}" data-task="{{task.title}}" data-date="{{task.due_date}}" data-assigned-to="{{task.assigned_to}}">Edit</button>
+												<button type="button" class="btn btn-danger" onclick="delete_task('{{ task.key.urlsafe() }}')">Delete</button>
 											</td>  
 											<td>{{ task.title }}</td>
 											<td>{{ task.created_by }}</td>  
@@ -65,8 +78,10 @@
 											<td>{{ task.due_date }}</td>  
 											{% if task.completed %}
 												<td><input type="checkbox" checked disabled data-on="COMPLETED" data-off="PENDING" data-toggle="toggle" data-onstyle="success"></td> 
+											{% elif task.un_assigned %}
+												<td><input type="checkbox" checked disabled data-on="UN-ASSIGNED" data-off="UN-ASSIGNED" data-toggle="toggle" data-onstyle="danger"></td> 
 											{% else %}
-												<td onclick="complete('{{ key }}:{{ task.title }}')"><input type="checkbox" data-on="COMPLETED" data-off="PENDING" data-toggle="toggle"></td> 
+												<td onclick="complete('{{ task.key.urlsafe() }}')"><input type="checkbox" data-on="COMPLETED" data-off="PENDING" data-toggle="toggle"></td> 
 											{% endif %}
 											<td>{{ task.completion_date }}</td> 
 										</tr>  
@@ -80,9 +95,13 @@
         </div>
 		</div>
 		<div class="col-lg-3">
-		<h1>users in taskboard</h1>
+		<h3>users in taskboard</h3>
+		<h5>{{ taskboard.created_by.email() }} <span class="glyphicon glyphicon-ok"></span></h5>
 		{% for user in taskboard.users %}
-			<h5>{{user}}</h5>
+		{% if user == taskboard.created_by %}
+		{% else %}
+			<h5>{{user.email()}} <span onclick="remove_user('{{ user.email() }}')" class="glyphicon glyphicon-remove"></span></h5>
+		{% endif %}
 		{% endfor %}
 		</div>
 		<!-- Invite User Modal -->
@@ -96,10 +115,10 @@
 					</div>
 					<div class="modal-body">
 						{% for user in all_users %}
-							{% if user.user.email() in taskboard.users %}
-							<p><label><input type="checkbox" value="{{key}};{{user.user.email()}}" disabled>{{user.user.email()}}</label></p>
+							{% if user.user in taskboard.users or user.user == taskboard.created_by %}
+							<p><label><input type="checkbox" value="{{user.user.email()}}" disabled>{{user.user.email()}}</label></p>
 							{% else %}
-							<p><label><input type="checkbox" value="{{key}};{{user.user.email()}}">{{user.user.email()}}</label></p>
+							<p><label><input type="checkbox" value="{{user.user.email()}}">{{user.user.email()}}</label></p>
 							{%endif %}
 						{% endfor %}
 					</div>
@@ -123,6 +142,12 @@
 					<div class="modal-body">
 						<p>Name of Task: <input id="task" type="text"></p>
 						<p>Due Date: <input type="text" id="due_date"></p>
+						<label for="cars">Assign a user:</label>
+							<select id="assigned_to">
+							{% for user in taskboard.users %}
+								<option value="{{user.email()}}">{{user.email()}}</option>
+							{% endfor %}
+							</select>
 						<button id="button_task" type="button" class="btn btn-primary" onclick="create()">Create</button></p>
 					</div>
 					<div class="modal-footer">
@@ -142,9 +167,16 @@
 						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
 					</div>
 					<div class="modal-body">
-						<p>Name of Task: <input id="task" type="text"></p>
-						<p>Due Date: <input type="text" id="due_date"></p>
-						<button id="button_task" type="button" class="btn btn-primary" onclick="create()">Create</button></p>
+						<p>Name of Key: <input id="edit-task-key" type="text"></p>
+						<p>Name of Task: <input id="edit-task" type="text"></p>
+						<p>Due Date: <input type="text" id="edit-due-date"></p>
+						<label for="users">Assign a user:</label>
+							<select id="edit-assigned-to">
+							{% for user in taskboard.users %}
+								<option value="{{user.email()}}">{{user.email()}}</option>
+							{% endfor %}
+							</select>
+						<button id="button_task" type="button" class="btn btn-primary" onclick="update()">Update</button></p>
 					</div>
 					<div class="modal-footer">
 						<button type="button" class="btn btn-default" data-dismiss="modal">Close</button></p>
@@ -154,6 +186,15 @@
 		</div>
 	</body>
 <script>
+$('#edit-taskboard-title').hide();
+function hide_title(){
+$('#taskboard-title').hide();
+$('#edit-taskboard-title').show();
+}
+function show_taskboard_title(){
+$('#taskboard-title').show();
+$('#edit-taskboard-title').hide();
+}
 document.getElementById("button_invite").style.display = "none";
 function check_task_exist() {
 	var taskboard = $("#taskboard").val();
@@ -183,9 +224,6 @@ function check_task_exist() {
 c=0;
 users = [];
 $(document).ready(function(){
-    $('#toggle_button').change(function() {
-      alert("go");
-    });
 	$('input[type="checkbox"]').click(function(){
 		if($(this).prop("checked") == true){
 			var value = $(this).val();
@@ -210,7 +248,7 @@ function invite(){
 		url : "/taskboard_details",
 		data : {
 			"data":data,
-			"taskboard_key":"{{key}}",
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"invite_user",
 		},
 		type: "POST",
@@ -223,12 +261,14 @@ function invite(){
 function create(){
 	var task = $("#task").val();
 	var due_date = $("#due_date").val();
+	var assigned_to = $("#assigned_to").val();
 	$.ajax({
 		url : "/taskboard_details",
 		data : {
 			"task":task,
 			"due_date":due_date,
-			"taskboard_key":"{{key}}",
+			"assigned_to":assigned_to,
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"create",
 		},
 		type: "POST",
@@ -247,7 +287,7 @@ function complete(task_key){
 		url : "/taskboard_details",
 		data : {
 			"task_key":task_key,
-			"taskboard_key":"{{key}}",
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"completed",
 		},
 		type: "POST",
@@ -261,22 +301,25 @@ function complete(task_key){
 		}
 	});
 }
-function edit(task_key){
+function update(){
+	var task = $("#edit-task").val();
+	var task_key = $("#edit-task-key").val();
+	var due_date = $("#edit-due-date").val();
+	var assigned_to = $("#edit-assigned-to").val();
 	$.ajax({
 		url : "/taskboard_details",
 		data : {
+			"task":task,
 			"task_key":task_key,
-			"taskboard_key":"{{key}}",
+			"due_date":due_date,
+			"assigned_to":assigned_to,
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"edit",
 		},
 		type: "POST",
 		success : function (data) {
 			//console.log(data);
-			if (data.task_completed){
 				location.reload();
-			}
-			else 
-				alert("error");
 		}
 	});
 }
@@ -285,7 +328,7 @@ function delete_task(task_key){
 		url : "/taskboard_details",
 		data : {
 			"task_key":task_key,
-			"taskboard_key":"{{key}}",
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"delete",
 		},
 		type: "POST",
@@ -299,11 +342,44 @@ function delete_task(task_key){
 		}
 	});
 }
-  $(function() {
-    $('#toggle-two').bootstrapToggle({
-      on: 'Enabled',
-      off: 'Disabled'
+function save_taskboard_title(task_key){
+	var title = $('#taskboard-new-title').val();
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"title":title,
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
+			"type":"change_title",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+				location.reload();
+		}
+	});
+}
+function remove_user(user_key){
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"user_key":user_key,
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
+			"type":"remove_user",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+				location.reload();
+		}
+	});
+}
+$(document).ready(function () {             
+    $('.open-my-modal').click(function(){
+        $('#edit-task-key').val($(this).data('key'));
+        $('#edit-task').val($(this).data('task'));
+        $('#edit-due-date').val($(this).data('date'));
+        $('#edit-assigned-to').val($(this).data('assigned-to'));
     });
-  });
+});
 </script>
 </html>

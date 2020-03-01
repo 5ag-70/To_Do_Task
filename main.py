@@ -32,7 +32,7 @@ class GetTaskboard(webapp2.RequestHandler):
 		request = self.request.POST	
 		taskboard_name = request['taskboard'].strip().capitalize()
 		taskboard = Taskboard()
-		taskboard_key = ndb.Key(Taskboard, user_email+':'+taskboard_name)
+		taskboard_key = ndb.Key(Taskboard, taskboard_name+user_email)
 		taskboard_exist = taskboard_key.get()
 		if not taskboard_exist:
 			response_data["taskboard_exist"] = False
@@ -67,11 +67,12 @@ class TaskboardPage(webapp2.RequestHandler):
 				new_user.put()
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
-			taskboards = new_user_key.get().taskboards
+			taskboard_keys = new_user_key.get().taskboards
+			taskboards = ndb.get_multi(taskboard_keys)
 			template_values = {
 				'welcome_message':welcome_message,
 				'logout_url':logout_url,
-				'taskboards':taskboards
+				'taskboards':taskboards,
 			}
 			template = JINJA_ENVIROMENT.get_template('taskboard.html')
 			self.response.write(template.render(template_values))
@@ -81,22 +82,23 @@ class TaskboardPage(webapp2.RequestHandler):
 		user_email = users.get_current_user().email()
 		taskboard_name = request['taskboard'].strip().capitalize()
 		taskboard = Taskboard()
-		taskboard_key = ndb.Key(Taskboard, taskboard_name)
-		taskboard_exist = taskboard_key.get()
-		taskboard.key = ndb.Key(Taskboard, user_email+':'+taskboard_name)
-		taskboard.taskboard = taskboard_name
+		ndb_taskboard_key = ndb.Key(Taskboard, taskboard_name+user_email)
+		taskboard_exist = ndb_taskboard_key.get()
+		taskboard.key = ndb_taskboard_key
+		taskboard.title = taskboard_name
 		taskboard.created_by = users.get_current_user()
+		taskboard.users.append(users.get_current_user())
 		taskboard.created_date = datetime.now()
 		taskboard.put()
 		user_key = ndb.Key(User, user_email)
 		user = user_key.get()
-		user.taskboards.append(user_email+':'+taskboard_name)
+		user.taskboards.append(ndb_taskboard_key)
 		user.put()
 		self.redirect('/taskboard')
 		
 
 class TaskboardDetailsPage(webapp2.RequestHandler):
-	def get(self, key):
+	def get(self, taskboard_key):
 		self.response.headers['Content-Type'] = 'text/html'
 		url = ''
 		url_string = ''
@@ -109,14 +111,10 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 			template = JINJA_ENVIROMENT.get_template('login.html')
 			self.response.write(template.render(template_values))
 		else:
-			taskboard_key = ndb.Key(Taskboard, key)
-			taskboard = taskboard_key.get()
-			tasks = []
+			ndb_taskboard_key = ndb.Key(urlsafe=taskboard_key)
+			taskboard = ndb_taskboard_key.get()
 			task_keys = taskboard.tasks
-			for task_key in task_keys:
-				ndb_task_key = ndb.Key(Task, task_key)
-				task = ndb_task_key.get()
-				tasks.append(task)
+			tasks = ndb.get_multi(task_keys)
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
 			all_users = User.query().fetch()
@@ -124,8 +122,8 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				'welcome_message':welcome_message,
 				'logout_url':logout_url,
 				'taskboard':taskboard,
-				'key':key,
 				'tasks':tasks,
+				'current_user':user,
 				'all_users':all_users,
 			}
 			template = JINJA_ENVIROMENT.get_template('taskboard-details.html')
@@ -136,41 +134,44 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 		response_data = {}
 		type = request['type']
 		taskboard_key = request['taskboard_key']
+		ndb_taskboard_key = ndb.Key(urlsafe=taskboard_key)
+		taskboard = ndb_taskboard_key.get()
 		try:
 			import simplejson as json
 		except(ImportError,):
 			import json
+			
 		if(type == 'invite_user'):
 			data = request['data']
 			userdata = json.loads(data)
-			for key in userdata:
-				user_key = key.split(';')[1]
-				ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
-				taskboard = ndb_taskboard_key.get()
+			for user_key in userdata:
 				ndb_user_key = ndb.Key(User, user_key)
 				userobj = ndb_user_key.get()
-				taskboard.users.append(user_key)
+				taskboard.users.append(userobj.user)
 				taskboard.put()
-				userobj.taskboards.append(taskboard_key)
+				userobj.taskboards.append(ndb_taskboard_key)
 				userobj.put()
 				self.response.headers['Content-Type'] = 'application/json'
 				return self.response.out.write(json.dumps(response_data))
 		elif(type == 'create'):
 			task_name = request['task']
 			due_date = request['due_date']
-			task_key = taskboard_key+":"+task_name
-			ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
-			taskboard = ndb_taskboard_key.get()
-			if task_key in taskboard.tasks:
+			assigned_to_email = request['assigned_to']
+			taskboard_name = taskboard.title
+			task_key = taskboard_name+task_name
+			ndb_task_key = ndb.Key(Task, task_key)
+			if ndb_task_key in taskboard.tasks:
 				response_data["task_exist"] = True
 			else:
 				response_data["task_exist"] = False
-				taskboard.tasks.append(task_key)
+				taskboard.tasks.append(ndb_task_key)
 				taskboard.put()
 				task = Task()
-				ndb_task_key = ndb.Key(Task, task_key)
 				task.key = ndb_task_key
 				task.title = task_name
+				ndb_user_key = ndb.Key(User, assigned_to_email)
+				assigned_to = ndb_user_key.get()
+				task.assigned_to = assigned_to.user
 				user = users.get_current_user()
 				task.created_by = user
 				task.due_date = due_date
@@ -181,7 +182,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 		elif(type == 'completed'):
 			task_key = request['task_key']
 			response_data["task_completed"] = True
-			ndb_task_key = ndb.Key(Task, task_key)
+			ndb_task_key = ndb.Key(urlsafe=task_key)
 			task = ndb_task_key.get()
 			task.completed = True
 			task.completion_date = datetime.now()
@@ -190,24 +191,59 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 			return self.response.out.write(json.dumps(response_data))
 		elif(type == 'edit'):
 			task_key = request['task_key']
-			response_data["task_completed"] = True
-			ndb_task_key = ndb.Key(Task, task_key)
+			task_name = request['task']
+			due_date = request['due_date']
+			assigned_to_key = request['assigned_to']
+			ndb_task_key = ndb.Key(urlsafe=task_key)
 			task = ndb_task_key.get()
-			task.completed = True
-			task.completion_date = datetime.now()
+			task.title = task_name
+			ndb_assigned_to_key = ndb.Key(User, assigned_to_key)
+			assigned_to = ndb_assigned_to_key.get()
+			task.assigned_to = assigned_to.user
+			task.due_date = due_date
+			task.un_assigned = False
+			task_key = taskboard.title+task_name
+			new_ndb_task_key = ndb.Key(Task, task_key)
+			task.key = new_ndb_task_key
+			index = taskboard.tasks.index(ndb_task_key)
+			ndb_task_key.delete()
 			task.put()
+			taskboard.tasks[index] = new_ndb_task_key
+			taskboard.put()
 			self.response.headers['Content-Type'] = 'application/json'
 			return self.response.out.write(json.dumps(response_data))
 		elif(type == 'delete'):
 			task_key = request['task_key']
 			response_data["task_deleted"] = True
-			ndb_task_key = ndb.Key(Task, task_key)
+			ndb_task_key = ndb.Key(urlsafe=task_key)
 			ndb_task_key.delete()
-			ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
-			taskboard = ndb_taskboard_key.get()
 			tasks = taskboard.tasks
-			tasks.remove(task_key)
+			tasks.remove(ndb_task_key)
 			taskboard.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'change_title'):
+			title = request['title']
+			taskboard.title = title
+			taskboard.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'remove_user'):
+			user_key = request['user_key']
+			ndb_user_key = ndb.Key(User, user_key)
+			user = ndb_user_key.get()
+			user.taskboards.remove(ndb_taskboard_key)
+			user.put()
+			users_of_taskboard = taskboard.users
+			users_of_taskboard.remove(user.user)
+			taskboard.put()
+			ndb_task_keys = taskboard.tasks
+			tasks = ndb.get_multi(ndb_task_keys)
+			for task in tasks:
+				if task.assigned_to == user.user:
+					task.assigned_to = None
+					task.un_assigned = True
+					task.put()
 			self.response.headers['Content-Type'] = 'application/json'
 			return self.response.out.write(json.dumps(response_data))
 
