@@ -3,23 +3,84 @@
 		<meta charset="utf-8"/>
 		<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 		<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 		<title>Taskboard Details</title>
 	</head>
 	<body>
-		<div class="col-lg-9 col-md-39 mb-0">
-			<h3>{{ taskboard.taskboard }}</h3>
+		<div class="col-lg-9 col-md-9 mb-0">
+			<h3>{{ taskboard.taskboard }} Taskboard</h3>
 		</div>
 		<div class="col-lg-3 col-md-3 mb-0">
 			<h5>{{ welcome_message }} <a href="{{ logout_url }}">Logout</a></h5>
+			<div class="col-lg-6 col-md-6 mb-0">
+				<button type="button" class="btn btn-info" data-toggle="modal" data-target="#inviteUserModal">Invite User</button>
+			</div>
+			<div class="col-lg-6 col-md-6 mb-0">
+				<button type="button" class="btn btn-info" data-toggle="modal" data-target="#taskModal">Create task</button>
+			</div>
 		</div>
-		<div class="col-lg-12 col-md-12 mb-0">
-			<img class="img-responsive" src="/images/task.jpg" alt="..." />
-			<h3 style="text-align:center;"><a href='{{url}}'>{{ taskboard.taskboard }}</a></h3>
+		<div class="col-lg-9">
+		<h1>task in taskboard</h1>
+		{% for task in taskboard.tasks %}
+			<h1>{{task}}</h1>
+		{% endfor %}
+		</div>
+		<div class="col-lg-3">
+		<h1>users in taskboard</h1>
+		{% for user in taskboard.users %}
+			<h5>{{user}}</h5>
+		{% endfor %}
+		</div>
+		<!-- Invite User Modal -->
+		<div id="inviteUserModal" class="modal fade" role="dialog">
+			<div class="modal-dialog">
+			<!-- Modal content-->
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+						<h4 class="modal-title">Invite Users to {{ taskboard.taskboard }} Taskboard</h4>
+					</div>
+					<div class="modal-body">
+						{% for user in all_users %}
+							{% if user.user.email() in taskboard.users %}
+							<p><label><input type="checkbox" value="{{key}};{{user.user.email()}}" disabled>{{user.user.email()}}</label></p>
+							{% else %}
+							<p><label><input type="checkbox" value="{{key}};{{user.user.email()}}">{{user.user.email()}}</label></p>
+							{%endif %}
+						{% endfor %}
+					</div>
+					<div class="modal-footer">
+						<button id="button_invite" type="button" class="btn btn-primary" onclick="invite()">Invite</button>
+						<p>check user box to invite  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button></p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Create Task Modal -->
+		<div id="taskModal" class="modal fade" role="dialog">
+			<div class="modal-dialog">
+			<!-- Modal content-->
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
+					</div>
+					<div class="modal-body">
+						<p><label><input id="task" type="text" placeholder="Enter name of task"></label>
+						<button id="button_task" type="button" class="btn btn-primary" onclick="create()">Create</button></p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Close</button></p>
+					</div>
+				</div>
+			</div>
 		</div>
 	</body>
-
 <script>
-function check_taskboard_exist() {
+document.getElementById("button_invite").style.display = "none";
+function check_task_exist() {
 	var taskboard = $("#taskboard").val();
 	taskboard_exist = true;
 	$.ajax({
@@ -43,6 +104,63 @@ function check_taskboard_exist() {
 		return false;
 	else
 		return true;
+}
+c=0;
+users = [];
+$(document).ready(function(){
+	$('input[type="checkbox"]').click(function(){
+		if($(this).prop("checked") == true){
+			var value = $(this).val();
+			users.push(value);
+			c++;
+		}
+		else if($(this).prop("checked") == false){
+			var value = $(this).val();
+			var index = users.indexOf(value)
+			users.splice(index, 1);
+			c--;
+		}
+		if(c>0)
+			document.getElementById("button_invite").style.display = "block";
+		else
+			document.getElementById("button_invite").style.display = "none";
+	});
+});
+function invite(){
+	var data = JSON.stringify(users);
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"data":data,
+			"taskboard_key":"{{key}}",
+			"type":"invite_user",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+			location.reload();
+		}
+	});
+}
+function create(){
+	var task = $("#task").val();
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"task":task,
+			"taskboard_key":"{{key}}",
+			"type":"create",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+			if (data.task_exist)
+				alert("task exist");
+			else 
+				location.reload();
+		}
+	});
+	$('#taskModal').modal('hide')
 }
 </script>
 </html>

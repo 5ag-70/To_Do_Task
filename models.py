@@ -8,6 +8,8 @@ class Taskboard(ndb.Model):
 	taskboard = ndb.StringProperty()
 	created_by = ndb.UserProperty()
 	created_date = ndb.DateTimeProperty()
+	users = ndb.StringProperty(repeated=True)
+	tasks = ndb.StringProperty(repeated=True)
 	
 class Task(ndb.Model):
 	task = ndb.StringProperty()

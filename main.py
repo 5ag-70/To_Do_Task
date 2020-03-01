@@ -27,11 +27,12 @@ class LoginPage(webapp2.RequestHandler):
 	
 class GetTaskboard(webapp2.RequestHandler):
 	def post(self):
+		user_email = users.get_current_user().email()
 		response_data = {}
 		request = self.request.POST	
 		taskboard_name = request['taskboard'].strip().capitalize()
 		taskboard = Taskboard()
-		taskboard_key = ndb.Key(Taskboard, taskboard_name)
+		taskboard_key = ndb.Key(Taskboard, user_email+':'+taskboard_name)
 		taskboard_exist = taskboard_key.get()
 		if not taskboard_exist:
 			response_data["taskboard_exist"] = False
@@ -77,19 +78,19 @@ class TaskboardPage(webapp2.RequestHandler):
 			
 	def post(self):
 		request = self.request.POST	
+		user_email = users.get_current_user().email()
 		taskboard_name = request['taskboard'].strip().capitalize()
 		taskboard = Taskboard()
 		taskboard_key = ndb.Key(Taskboard, taskboard_name)
 		taskboard_exist = taskboard_key.get()
-		taskboard.key = ndb.Key(Taskboard, taskboard_name)
+		taskboard.key = ndb.Key(Taskboard, user_email+':'+taskboard_name)
 		taskboard.taskboard = taskboard_name
 		taskboard.created_by = users.get_current_user()
 		taskboard.created_date = datetime.now()
 		taskboard.put()
-		user_email = users.get_current_user().email()
 		user_key = ndb.Key(User, user_email)
 		user = user_key.get()
-		user.taskboards.append(taskboard_name)
+		user.taskboards.append(user_email+':'+taskboard_name)
 		user.put()
 		self.redirect('/taskboard')
 		
@@ -112,32 +113,55 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 			taskboard = taskboard_key.get()
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
+			all_users = User.query().fetch()
 			template_values = {
 				'welcome_message':welcome_message,
 				'logout_url':logout_url,
-				'taskboard':taskboard
+				'taskboard':taskboard,
+				'key':key,
+				'all_users':all_users,
 			}
 			template = JINJA_ENVIROMENT.get_template('taskboard-details.html')
 			self.response.write(template.render(template_values))
 			
 	def post(self):
 		request = self.request.POST	
-		taskboard_name = request['taskboard'].strip().capitalize()
-		taskboard = Taskboard()
-		taskboard_key = ndb.Key(Taskboard, taskboard_name)
-		taskboard_exist = taskboard_key.get()
-		taskboard.key = ndb.Key(Taskboard, taskboard_name)
-		taskboard.taskboard = taskboard_name
-		taskboard.created_by = users.get_current_user()
-		taskboard.created_date = datetime.now()
-		taskboard.put()
-		user_email = users.get_current_user().email()
-		user_key = ndb.Key(User, user_email)
-		user = user_key.get()
-		user.taskboards.append(taskboard_name)
-		user.put()
-		self.redirect('/taskboard')
-		
+		response_data = {}
+		type = request['type']
+		taskboard_key = request['taskboard_key']
+		try:
+			import simplejson as json
+		except(ImportError,):
+			import json
+		if(type == 'invite_user'):
+			data = request['data']
+			userdata = json.loads(data)
+			taskboard_key = ''
+			for key in userdata:
+				taskboard_key = key.split(';')[0]
+				user_key = key.split(';')[1]
+				ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
+				taskboard = ndb_taskboard_key.get()
+				ndb_user_key = ndb.Key(User, user_key)
+				userobj = ndb_user_key.get()
+				taskboard.users.append(user_key)
+				taskboard.put()
+				userobj.taskboards.append(taskboard_key)
+				userobj.put()
+				self.response.headers['Content-Type'] = 'application/json'
+				return self.response.out.write(json.dumps(response_data))
+		else:
+			task = request['task']
+			ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
+			taskboard = ndb_taskboard_key.get()
+			if task in taskboard.tasks:
+				response_data["task_exist"] = True
+			else:
+				response_data["task_exist"] = False
+				taskboard.tasks.append(task)
+				taskboard.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
 
 JINJA_ENVIROMENT = jinja2.Environment(
 	loader = jinja2.FileSystemLoader(os.path.dirname(__file__)),
@@ -149,5 +173,6 @@ app = webapp2.WSGIApplication([
 	('/', LoginPage),
 	('/get_taskboard', GetTaskboard),
 	('/taskboard', TaskboardPage),
+	('/taskboard_details', TaskboardDetailsPage),
 	('/taskboard_details/(.*)', TaskboardDetailsPage),
 ], debug = True)
