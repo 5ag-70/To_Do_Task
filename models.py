@@ -1,13 +1,15 @@
 from google.appengine.ext import ndb
 
+class User(ndb.Model):
+	user = ndb.UserProperty()
+	taskboards = ndb.StringProperty(repeated=True)
+
 class Taskboard(ndb.Model):
-	name = ndb.StringProperty()
+	taskboard = ndb.StringProperty()
 	created_by = ndb.UserProperty()
-	users = ndb.UserProperty(repeated=true)
-	tasks = ndb.StructuredProperty(Task, repeated=true)
+	created_date = ndb.DateTimeProperty()
 	
 class Task(ndb.Model):
-	taskboard = ndb.KeyProperty(kind=Taskboard)
 	task = ndb.StringProperty()
 	assigned_user = ndb.UserProperty()
 	completed = ndb.BooleanProperty()
