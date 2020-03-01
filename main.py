@@ -4,7 +4,7 @@ import os
 import json
 from google.appengine.api import users
 from google.appengine.ext import ndb
-from models import User, Taskboard
+from models import User, Taskboard, Task
 from datetime import datetime
 
 class LoginPage(webapp2.RequestHandler):
@@ -111,6 +111,12 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 		else:
 			taskboard_key = ndb.Key(Taskboard, key)
 			taskboard = taskboard_key.get()
+			tasks = []
+			task_keys = taskboard.tasks
+			for task_key in task_keys:
+				ndb_task_key = ndb.Key(Task, task_key)
+				task = ndb_task_key.get()
+				tasks.append(task)
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
 			all_users = User.query().fetch()
@@ -119,6 +125,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				'logout_url':logout_url,
 				'taskboard':taskboard,
 				'key':key,
+				'tasks':tasks,
 				'all_users':all_users,
 			}
 			template = JINJA_ENVIROMENT.get_template('taskboard-details.html')
@@ -136,9 +143,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 		if(type == 'invite_user'):
 			data = request['data']
 			userdata = json.loads(data)
-			taskboard_key = ''
 			for key in userdata:
-				taskboard_key = key.split(';')[0]
 				user_key = key.split(';')[1]
 				ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
 				taskboard = ndb_taskboard_key.get()
@@ -150,16 +155,59 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				userobj.put()
 				self.response.headers['Content-Type'] = 'application/json'
 				return self.response.out.write(json.dumps(response_data))
-		else:
-			task = request['task']
+		elif(type == 'create'):
+			task_name = request['task']
+			due_date = request['due_date']
+			task_key = taskboard_key+":"+task_name
 			ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
 			taskboard = ndb_taskboard_key.get()
-			if task in taskboard.tasks:
+			if task_key in taskboard.tasks:
 				response_data["task_exist"] = True
 			else:
 				response_data["task_exist"] = False
-				taskboard.tasks.append(task)
+				taskboard.tasks.append(task_key)
 				taskboard.put()
+				task = Task()
+				ndb_task_key = ndb.Key(Task, task_key)
+				task.key = ndb_task_key
+				task.title = task_name
+				user = users.get_current_user()
+				task.created_by = user
+				task.due_date = due_date
+				task.completed = False
+				task.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'completed'):
+			task_key = request['task_key']
+			response_data["task_completed"] = True
+			ndb_task_key = ndb.Key(Task, task_key)
+			task = ndb_task_key.get()
+			task.completed = True
+			task.completion_date = datetime.now()
+			task.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'edit'):
+			task_key = request['task_key']
+			response_data["task_completed"] = True
+			ndb_task_key = ndb.Key(Task, task_key)
+			task = ndb_task_key.get()
+			task.completed = True
+			task.completion_date = datetime.now()
+			task.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'delete'):
+			task_key = request['task_key']
+			response_data["task_deleted"] = True
+			ndb_task_key = ndb.Key(Task, task_key)
+			ndb_task_key.delete()
+			ndb_taskboard_key = ndb.Key(Taskboard, taskboard_key)
+			taskboard = ndb_taskboard_key.get()
+			tasks = taskboard.tasks
+			tasks.remove(task_key)
+			taskboard.put()
 			self.response.headers['Content-Type'] = 'application/json'
 			return self.response.out.write(json.dumps(response_data))
 

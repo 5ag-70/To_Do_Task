@@ -3,8 +3,18 @@
 		<meta charset="utf-8"/>
 		<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 		<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="/resources/demos/style.css">
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+		<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+		<link href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" rel="stylesheet">
+		<script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js"></script>
+		<script>
+			$( function() {
+				$( "#due_date" ).datepicker();
+			} );
+		</script>
 		<title>Taskboard Details</title>
 	</head>
 	<body>
@@ -22,9 +32,52 @@
 		</div>
 		<div class="col-lg-9">
 		<h1>task in taskboard</h1>
-		{% for task in taskboard.tasks %}
-			<h1>{{task}}</h1>
-		{% endfor %}
+        <div class="container-fluid">
+                <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+                    <div class="card">
+                        <div class="header">
+                            <h2>ALL TASKS</h2>
+                        </div>
+                        <div class="body">
+                            <div class="table-responsive">
+								<table class="table table-responsive table-sm table-hover table-bordered">  
+									<thead class="hideextra bg-primary">  
+										<tr>   
+											<th>ACTION</th>  
+											<th>TITLE</th>  
+											<th>CREATED BY</th> 
+											<th>ASSIGNED TO</th> 
+											<th>DUE DATE</th>  
+											<th>COMPLETED</th>
+											<th>COMPLETION DATE</th>
+										</tr>  
+									</thead>
+									<tbody class="hideextra">  
+									{% for task in tasks %} 
+										<tr>  
+											<td>
+												<button type="button" class="btn btn-info" data-toggle="modal" data-target="#editTaskModal">Edit</button>
+												<button type="button" class="btn btn-danger" onclick="delete_task('{{ key }}:{{ task.title }}')">Delete</button>
+											</td>  
+											<td>{{ task.title }}</td>
+											<td>{{ task.created_by }}</td>  
+											<td>{{ task.assigned_to }}</td>   
+											<td>{{ task.due_date }}</td>  
+											{% if task.completed %}
+												<td><input type="checkbox" checked disabled data-on="COMPLETED" data-off="PENDING" data-toggle="toggle" data-onstyle="success"></td> 
+											{% else %}
+												<td onclick="complete('{{ key }}:{{ task.title }}')"><input type="checkbox" data-on="COMPLETED" data-off="PENDING" data-toggle="toggle"></td> 
+											{% endif %}
+											<td>{{ task.completion_date }}</td> 
+										</tr>  
+									{% endfor %}  
+									</tbody>  
+								</table>  
+							</div>
+                        </div>
+                    </div>
+                </div>
+        </div>
 		</div>
 		<div class="col-lg-3">
 		<h1>users in taskboard</h1>
@@ -68,7 +121,29 @@
 						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
 					</div>
 					<div class="modal-body">
-						<p><label><input id="task" type="text" placeholder="Enter name of task"></label>
+						<p>Name of Task: <input id="task" type="text"></p>
+						<p>Due Date: <input type="text" id="due_date"></p>
+						<button id="button_task" type="button" class="btn btn-primary" onclick="create()">Create</button></p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Close</button></p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+		<!-- Edit Task Modal -->
+		<div id="editTaskModal" class="modal fade" role="dialog">
+			<div class="modal-dialog">
+			<!-- Modal content-->
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
+					</div>
+					<div class="modal-body">
+						<p>Name of Task: <input id="task" type="text"></p>
+						<p>Due Date: <input type="text" id="due_date"></p>
 						<button id="button_task" type="button" class="btn btn-primary" onclick="create()">Create</button></p>
 					</div>
 					<div class="modal-footer">
@@ -108,6 +183,9 @@ function check_task_exist() {
 c=0;
 users = [];
 $(document).ready(function(){
+    $('#toggle_button').change(function() {
+      alert("go");
+    });
 	$('input[type="checkbox"]').click(function(){
 		if($(this).prop("checked") == true){
 			var value = $(this).val();
@@ -144,10 +222,12 @@ function invite(){
 }
 function create(){
 	var task = $("#task").val();
+	var due_date = $("#due_date").val();
 	$.ajax({
 		url : "/taskboard_details",
 		data : {
 			"task":task,
+			"due_date":due_date,
 			"taskboard_key":"{{key}}",
 			"type":"create",
 		},
@@ -162,5 +242,68 @@ function create(){
 	});
 	$('#taskModal').modal('hide')
 }
+function complete(task_key){
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"task_key":task_key,
+			"taskboard_key":"{{key}}",
+			"type":"completed",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+			if (data.task_completed){
+				location.reload();
+			}
+			else 
+				alert("error");
+		}
+	});
+}
+function edit(task_key){
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"task_key":task_key,
+			"taskboard_key":"{{key}}",
+			"type":"edit",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+			if (data.task_completed){
+				location.reload();
+			}
+			else 
+				alert("error");
+		}
+	});
+}
+function delete_task(task_key){
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"task_key":task_key,
+			"taskboard_key":"{{key}}",
+			"type":"delete",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+			if (data.task_deleted){
+				location.reload();
+			}
+			else 
+				alert("error");
+		}
+	});
+}
+  $(function() {
+    $('#toggle-two').bootstrapToggle({
+      on: 'Enabled',
+      off: 'Disabled'
+    });
+  });
 </script>
 </html>

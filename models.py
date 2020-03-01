@@ -12,6 +12,10 @@ class Taskboard(ndb.Model):
 	tasks = ndb.StringProperty(repeated=True)
 	
 class Task(ndb.Model):
-	task = ndb.StringProperty()
-	assigned_user = ndb.UserProperty()
+	title = ndb.StringProperty()
+	assigned_to = ndb.UserProperty()
+	created_by = ndb.UserProperty()
+	due_date = ndb.StringProperty()
 	completed = ndb.BooleanProperty()
+	un_assigned = ndb.BooleanProperty()
+	completion_date = ndb.DateProperty()
