@@ -127,6 +127,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 					active_tasks+=1
 				if task.completion_date == datetime.date(datetime.now()):
 					completed_today_tasks+=1
+			total_tasksboard_users = len(taskboard.users)
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
 			all_users = User.query().fetch()
@@ -141,6 +142,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				'completed_today_tasks':completed_today_tasks,
 				'current_user':user,
 				'all_users':all_users,
+				'total_tasksboard_users':total_tasksboard_users,
 			}
 			template = JINJA_ENVIROMENT.get_template('taskboard-details.html')
 			self.response.write(template.render(template_values))
@@ -260,6 +262,16 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 					task.assigned_to = None
 					task.un_assigned = True
 					task.put()
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
+		elif(type == 'delete_taskboard'):
+			all_users = User.query().fetch()
+			for user in all_users:
+				taskboards = user.taskboards
+				if ndb_taskboard_key in taskboards:
+					taskboards.remove(ndb_taskboard_key)
+				user.put()
+			ndb_taskboard_key.delete()
 			self.response.headers['Content-Type'] = 'application/json'
 			return self.response.out.write(json.dumps(response_data))
 

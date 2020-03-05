@@ -21,7 +21,7 @@
 	<body>
 		<div id="taskboard-title" class="col-lg-9 col-md-9 mb-0">
 			{% if current_user == taskboard.created_by %}
-				<h3>{{ taskboard.title }} Taskboard<span onclick="hide_title()" class="glyphicon glyphicon-pencil"></span></h3>
+				<h3>{{ taskboard.title }} Taskboard<span onclick="hide_title()" class="glyphicon glyphicon-pencil"></span><span onclick="delete_taskboard()" class="glyphicon glyphicon-trash"></span></h3>
 			{% else %}
 				<h3>{{ taskboard.title }} Taskboard</h3>
 			{% endif %}
@@ -69,7 +69,11 @@
 									{% for task in tasks %} 
 										<tr>  
 											<td>
+											{% if task.completed %}
+												<button type="button" class="btn btn-info open-my-modal" disabled data-toggle="modal" data-target="#editTaskModal" data-key="{{ task.key.urlsafe() }}" data-task="{{task.title}}" data-date="{{task.due_date}}" data-assigned-to="{{task.assigned_to}}">Edit</button>
+											{% else %}
 												<button type="button" class="btn btn-info open-my-modal" data-toggle="modal" data-target="#editTaskModal" data-key="{{ task.key.urlsafe() }}" data-task="{{task.title}}" data-date="{{task.due_date}}" data-assigned-to="{{task.assigned_to}}">Edit</button>
+											{% endif %}
 												<button type="button" class="btn btn-danger" onclick="delete_task('{{ task.key.urlsafe() }}')">Delete</button>
 											</td>  
 											<td>{{ task.title }}</td>
@@ -384,6 +388,24 @@ function remove_user(user_key){
 		success : function (data) {
 			//console.log(data);
 				location.reload();
+		}
+	});
+}
+function delete_taskboard(){
+	if({{ total_tasks }}>0 || {{ total_tasksboard_users }}>1){
+		alert("Please remove all TASKS and USERS before removing Taskboard");
+		return;
+	}
+	$.ajax({
+		url : "/taskboard_details",
+		data : {
+			"taskboard_key":"{{taskboard.key.urlsafe()}}",
+			"type":"delete_taskboard",
+		},
+		type: "POST",
+		success : function (data) {
+			//console.log(data);
+				window.location = "/";
 		}
 	});
 }
