@@ -27,7 +27,7 @@
 			{% endif %}
 		</div>
 		<div id="edit-taskboard-title" class="col-lg-9 col-md-9 mb-0">
-			<h3><input id="taskboard-new-title" type="text" value="{{ taskboard.title }}">
+			<h3><input id="taskboard-new-title" type="text" value="{{ taskboard.title }}" required>
 				<Button onclick="save_taskboard_title()" class="btn-success">Save</Button>
 				<Button onclick="show_taskboard_title()" class="btn-danger">Cancel</Button>
 			</h3>
@@ -103,6 +103,12 @@
 			<h5>{{user.email()}} <span onclick="remove_user('{{ user.email() }}')" class="glyphicon glyphicon-remove"></span></h5>
 		{% endif %}
 		{% endfor %}
+		</br></br>
+		</br>
+		<h3>Total Tasks - {{ total_tasks }}</h3>
+		<h3>Completed Tasks - {{ completed_tasks }}</h3>
+		<h3>Active Tasks - {{ active_tasks }}</h3>
+		<h3>Completed Today Tasks - {{ completed_today_tasks }}</h3>
 		</div>
 		<!-- Invite User Modal -->
 		<div id="inviteUserModal" class="modal fade" role="dialog">
@@ -140,10 +146,10 @@
 						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
 					</div>
 					<div class="modal-body">
-						<p>Name of Task: <input id="task" type="text"></p>
-						<p>Due Date: <input type="text" id="due_date"></p>
+						<p>Name of Task: <input id="task" type="text" required></p>
+						<p>Due Date: <input type="text" id="due_date" required></p>
 						<label for="cars">Assign a user:</label>
-							<select id="assigned_to">
+							<select id="assigned_to" required>
 							{% for user in taskboard.users %}
 								<option value="{{user.email()}}">{{user.email()}}</option>
 							{% endfor %}
@@ -167,11 +173,11 @@
 						<h4 class="modal-title">Create task in {{ taskboard.taskboard }} Taskboard</h4>
 					</div>
 					<div class="modal-body">
-						<p>Name of Key: <input id="edit-task-key" type="text"></p>
-						<p>Name of Task: <input id="edit-task" type="text"></p>
-						<p>Due Date: <input type="text" id="edit-due-date"></p>
+						<input id="edit-task-key" type="hidden">
+						<p>Name of Task: <input id="edit-task" type="text" required></p>
+						<p>Due Date: <input type="text" id="edit-due-date" required></p>
 						<label for="users">Assign a user:</label>
-							<select id="edit-assigned-to">
+							<select id="edit-assigned-to" required>
 							{% for user in taskboard.users %}
 								<option value="{{user.email()}}">{{user.email()}}</option>
 							{% endfor %}
@@ -262,6 +268,10 @@ function create(){
 	var task = $("#task").val();
 	var due_date = $("#due_date").val();
 	var assigned_to = $("#assigned_to").val();
+	if(task == '' || due_date == '' || assigned_to == ''){
+		alert('Please fill all the fields');
+		return;
+	}
 	$.ajax({
 		url : "/taskboard_details",
 		data : {
@@ -306,6 +316,10 @@ function update(){
 	var task_key = $("#edit-task-key").val();
 	var due_date = $("#edit-due-date").val();
 	var assigned_to = $("#edit-assigned-to").val();
+	if(task == '' || due_date == '' || assigned_to == ''){
+		alert('Please fill all the fields');
+		return;
+	}
 	$.ajax({
 		url : "/taskboard_details",
 		data : {

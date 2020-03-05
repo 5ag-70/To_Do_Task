@@ -115,6 +115,18 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 			taskboard = ndb_taskboard_key.get()
 			task_keys = taskboard.tasks
 			tasks = ndb.get_multi(task_keys)
+			total_tasks = 0
+			completed_tasks = 0
+			active_tasks = 0
+			completed_today_tasks = 0
+			for task in tasks:
+				total_tasks+=1
+				if task.completed:
+					completed_tasks+=1
+				if not task.completed:
+					active_tasks+=1
+				if task.completion_date == datetime.date(datetime.now()):
+					completed_today_tasks+=1
 			welcome_message = 'hi, ' + user.email()
 			logout_url = users.create_logout_url(self.request.uri)
 			all_users = User.query().fetch()
@@ -123,6 +135,10 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				'logout_url':logout_url,
 				'taskboard':taskboard,
 				'tasks':tasks,
+				'total_tasks':total_tasks,
+				'completed_tasks':completed_tasks,
+				'active_tasks':active_tasks,
+				'completed_today_tasks':completed_today_tasks,
 				'current_user':user,
 				'all_users':all_users,
 			}
