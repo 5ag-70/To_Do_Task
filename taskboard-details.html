@@ -100,7 +100,7 @@
 		</div>
 		<div class="col-lg-3">
 		<h3>users in taskboard</h3>
-		<h5>{{ taskboard.created_by.email() }} <span class="glyphicon glyphicon-ok"></span></h5>
+		<h5>{{ taskboard.created_by.email() }}<span style="color:red;"> ADMIN</span></h5>
 		{% for user in taskboard.users %}
 		{% if user == taskboard.created_by %}
 		{% else %}
@@ -381,12 +381,16 @@ function remove_user(user_key){
 		url : "/taskboard_details",
 		data : {
 			"user_key":user_key,
+			"current_user_email":"{{current_user.email()}}",
 			"taskboard_key":"{{taskboard.key.urlsafe()}}",
 			"type":"remove_user",
 		},
 		type: "POST",
 		success : function (data) {
 			//console.log(data);
+			if(data.goback)
+				window.location = "/"
+			else
 				location.reload();
 		}
 	});

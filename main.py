@@ -169,8 +169,8 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 				taskboard.put()
 				userobj.taskboards.append(ndb_taskboard_key)
 				userobj.put()
-				self.response.headers['Content-Type'] = 'application/json'
-				return self.response.out.write(json.dumps(response_data))
+			self.response.headers['Content-Type'] = 'application/json'
+			return self.response.out.write(json.dumps(response_data))
 		elif(type == 'create'):
 			task_name = request['task']
 			due_date = request['due_date']
@@ -248,6 +248,7 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 			return self.response.out.write(json.dumps(response_data))
 		elif(type == 'remove_user'):
 			user_key = request['user_key']
+			current_user_email = request['current_user_email']
 			ndb_user_key = ndb.Key(User, user_key)
 			user = ndb_user_key.get()
 			user.taskboards.remove(ndb_taskboard_key)
@@ -262,6 +263,10 @@ class TaskboardDetailsPage(webapp2.RequestHandler):
 					task.assigned_to = None
 					task.un_assigned = True
 					task.put()
+			if(current_user_email == user_key):
+				response_data["goback"] = True
+			else:
+				response_data["goback"] = False
 			self.response.headers['Content-Type'] = 'application/json'
 			return self.response.out.write(json.dumps(response_data))
 		elif(type == 'delete_taskboard'):
